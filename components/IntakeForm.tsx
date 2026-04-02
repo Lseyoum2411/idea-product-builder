@@ -14,7 +14,7 @@ import { TechInput } from "@/components/form/TechInput";
 import { TimelineSelect } from "@/components/form/TimelineSelect";
 import { Button } from "@/components/shared/Button";
 import { SectionCard } from "@/components/shared/SectionCard";
-import type { BuilderOutputs, IntakeInputs } from "@/types";
+import type { IntakeInputs, ResultSessionPayload } from "@/types";
 
 const STORAGE_KEY = "product-buddy-session";
 
@@ -75,16 +75,22 @@ export function IntakeForm() {
           typeof data.error === "string" ? data.error : "Generation failed"
         );
       }
-      const outputs = data.outputs as BuilderOutputs | undefined;
+      const outputs = data.outputs as ResultSessionPayload["outputs"] | undefined;
       if (!outputs) throw new Error("Invalid response from server");
 
-      sessionStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          outputs,
-          inputs: data.inputs as IntakeInputs,
-        })
-      );
+      const session: ResultSessionPayload = {
+        outputs,
+        inputs: data.inputs as IntakeInputs,
+        slug: typeof data.slug === "string" ? data.slug : undefined,
+        shareUrl:
+          typeof data.shareUrl === "string" ? data.shareUrl : undefined,
+        feasibility: data.feasibility ?? undefined,
+        complexityByPhase:
+          data.complexityByPhase && typeof data.complexityByPhase === "object"
+            ? data.complexityByPhase
+            : undefined,
+      };
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
       router.push("/result");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");

@@ -1,5 +1,10 @@
-import type { BuilderOutputs, IntakeInputs } from "@/types";
-import { callClaude } from "@/lib/claude";
+import type {
+  AnticipatedComplexityFlag,
+  BuilderOutputs,
+  FeasibilityScore,
+  IntakeInputs,
+} from "@/types";
+import { callClaude, MODEL_HAIKU } from "@/lib/claude";
 import { getTechStackContext } from "@/lib/techstack";
 import { getTimelineContext } from "@/lib/timeline";
 
@@ -142,4 +147,149 @@ export async function generateAllOutputs(
   const raw = await callClaude(buildSystemPrompt(), buildUserPrompt(inputs));
   const parsed = parseClaudeJSON<unknown>(raw);
   return validateOutputs(parsed);
+}
+
+export function buildRefinementSystemPrompt(): string {
+  return `You are updating an existing solo-builder product plan. Respond with ONLY valid JSON — no markdown fences, no commentary. Use this exact shape:
+{
+  "prd": string,
+  "aiPrompts": { "title": string, "prompt": string }[],
+  "roadmap": { "title": string, "description": string, "timeframe"?: string }[],
+  "techStack": string,
+  "codeSnippets": { "title": string, "language": string, "code": string }[],
+  "soloChecklist": { "phase": string, "tasks": string[], "estimatedHours": number }[]
+}
+Rules:
+- Apply the user's change description to the previous plan. Update only sections that must change for consistency; keep unchanged sections the same verbatim when possible.
+- If timeline or scope shifts, revise roadmap and soloChecklist (hours) accordingly.
+- If features change, revise PRD, aiPrompts, and related snippets as needed.
+- Always return the complete object with all keys.`;
+}
+
+export function buildRefinementUserPrompt(
+  previous: BuilderOutputs,
+  inputs: IntakeInputs,
+  changeDescription: string
+): string {
+  return `${buildUserPrompt(inputs)}
+
+--- Previous plan (JSON) ---
+${JSON.stringify(previous)}
+
+--- What changed ---
+${changeDescription}
+
+Return the full updated JSON now.`;
+}
+
+export async function generateRefinedOutputs(
+  previous: BuilderOutputs,
+  inputs: IntakeInputs,
+  changeDescription: string
+): Promise<BuilderOutputs> {
+  const raw = await callClaude(
+    buildRefinementSystemPrompt(),
+    buildRefinementUserPrompt(previous, inputs, changeDescription)
+  );
+  const parsed = parseClaudeJSON<unknown>(raw);
+  return validateOutputs(parsed);
+}
+
+function bucketLabel(
+  score: number
+): FeasibilityScore["label"] {
+  if (score <= 40) return "Overloaded";
+  if (score <= 70) return "Ambitious";
+  if (score <= 90) return "Solid";
+  return "Comfortable";
+}
+
+function validateFeasibility(data: unknown): FeasibilityScore | null {
+  if (!data || typeof data !== "object") return null;
+  const o = data as Record<string, unknown>;
+  const score =
+    typeof o.score === "number" && !Number.isNaN(o.score)
+      ? Math.max(0, Math.min(100, Math.round(o.score)))
+      : null;
+  if (score === null) return null;
+  const summary =
+    typeof o.summary === "string" ? o.summary : "Feasibility assessment.";
+  return { score, label: bucketLabel(score), summary };
+}
+
+export async function fetchFeasibilityScore(
+  inputs: IntakeInputs
+): Promise<FeasibilityScore | null> {
+  const featureLine =
+    inputs.featurePrioritization?.trim() ||
+    "(Infer likely features from the product idea.)";
+  const system = `You assess feasibility for a solo builder. Reply with ONLY JSON: {"score": number 0-100, "label": string, "summary": string}
+Label must be exactly one of: "Overloaded", "Ambitious", "Solid", "Comfortable" based on score ranges:
+0-40 Overloaded, 41-70 Ambitious, 71-90 Solid, 91-100 Comfortable.
+Summary: one sentence, concrete.`;
+
+  const user = `Product idea: ${inputs.productIdea}
+Timeline: ${inputs.timeline}
+Target audience: ${inputs.targetAudience}
+Platform: ${inputs.platform}
+Feature / scope notes: ${featureLine}`;
+
+  try {
+    const raw = await callClaude(system, user, {
+      model: MODEL_HAIKU,
+      maxTokens: 300,
+      temperature: 0,
+    });
+    return validateFeasibility(parseClaudeJSON<unknown>(raw));
+  } catch {
+    return null;
+  }
+}
+
+function validateAnticipatedFlags(
+  data: unknown
+): AnticipatedComplexityFlag[] {
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const r = row as Record<string, unknown>;
+      return {
+        phase: typeof r.phase === "string" ? r.phase.trim() : "",
+        flag: r.flag === true,
+        reason: typeof r.reason === "string" ? r.reason.trim() : "",
+      };
+    })
+    .filter(
+      (x): x is AnticipatedComplexityFlag =>
+        !!x &&
+        x.phase.length > 0 &&
+        (!x.flag || x.reason.length > 0)
+    );
+}
+
+export async function fetchAnticipatedComplexityFlags(
+  inputs: IntakeInputs
+): Promise<AnticipatedComplexityFlag[]> {
+  const system = `You flag solo-builder checklist phases that are often deceptively hard (underestimated effort, tricky edge cases, platform constraints).
+Reply with ONLY a JSON array (no wrapper object), e.g.:
+[{"phase":"short phase title you expect on a checklist","flag":true,"reason":"why it's tricky for one person"}]
+Include 3–8 objects. Use flag true only for genuinely risky areas; you may include flag false for non-risk phases to pad structure if needed.
+Phase titles should be short (2–6 words) so they can match real checklist headings later.`;
+
+  const user = `Product idea: ${inputs.productIdea}
+Platform: ${inputs.platform}
+Timeline: ${inputs.timeline}
+Tech / integrations context: ${inputs.techPreferences || "unspecified"} ${inputs.integrations || ""}`;
+
+  try {
+    const raw = await callClaude(system, user, {
+      model: MODEL_HAIKU,
+      maxTokens: 500,
+      temperature: 0,
+    });
+    return validateAnticipatedFlags(parseClaudeJSON<unknown>(raw));
+  } catch {
+    return [];
+  }
 }

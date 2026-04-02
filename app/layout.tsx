@@ -14,7 +14,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Product Buddy",
+  title: "ProductBuddy",
   description: "Turn a product idea into a structured solo build plan",
 };
 

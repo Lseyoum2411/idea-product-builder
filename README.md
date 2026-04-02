@@ -15,6 +15,15 @@ cp .env.example .env.local
 npm install
 ```
 
+### Supabase (shareable `/plan/[slug]` links)
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. Run the SQL in [`supabase/plans.sql`](supabase/plans.sql) in the SQL editor.
+3. Copy **Project URL** → `NEXT_PUBLIC_SUPABASE_URL` and **service role** key → `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` (server-only; never expose in client code).
+4. Optional: set `NEXT_PUBLIC_APP_URL` to your production URL (e.g. `https://productbuddy.app`) so share links are correct in API responses.
+
+Without Supabase, generation still works; share links and persistence are skipped.
+
 ## Push to GitHub (first time)
 
 Signing into **Vercel** does not log in the **GitHub CLI** on your machine. The repo is already committed locally on `main`. Do this once in **PowerShell** (GitHub CLI was installed as `gh`):

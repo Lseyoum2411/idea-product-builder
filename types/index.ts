@@ -40,3 +40,46 @@ export interface IntakeInputs {
   featurePrioritization?: string;
   integrations?: string;
 }
+
+/** Stored in Supabase `outputs` JSON column */
+export interface FeasibilityScore {
+  score: number;
+  label: "Overloaded" | "Ambitious" | "Solid" | "Comfortable";
+  summary: string;
+}
+
+export interface AnticipatedComplexityFlag {
+  phase: string;
+  flag: boolean;
+  reason: string;
+}
+
+export interface PersistedPlanOutputs {
+  builder: BuilderOutputs;
+  feasibility: FeasibilityScore | null;
+  /** Per checklist phase title */
+  complexityByPhase: Record<string, PhaseComplexityDisplay>;
+}
+
+export interface PhaseComplexityDisplay {
+  flagged: boolean;
+  reason?: string;
+}
+
+export type TabId =
+  | "prd"
+  | "prompts"
+  | "roadmap"
+  | "tech"
+  | "code"
+  | "checklist";
+
+export interface ResultSessionPayload {
+  outputs: BuilderOutputs;
+  inputs: IntakeInputs;
+  slug?: string;
+  shareUrl?: string;
+  feasibility?: FeasibilityScore | null;
+  complexityByPhase?: Record<string, PhaseComplexityDisplay>;
+  updatedTabs?: TabId[];
+}
