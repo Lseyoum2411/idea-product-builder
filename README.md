@@ -19,6 +19,12 @@ npm install
 
 Signing into **Vercel** does not log in the **GitHub CLI** on your machine. The repo is already committed locally on `main`. Do this once in **PowerShell** (GitHub CLI was installed as `gh`):
 
+If you see **`gh` is not recognized**, either **close and reopen** the terminal (so PATH reloads) or run this once in that window:
+
+```powershell
+$env:Path = "$env:ProgramFiles\GitHub CLI;$env:Path"
+```
+
 ```powershell
 cd C:\Users\lksey\idea-product-builder
 gh auth login -h github.com -p https -w

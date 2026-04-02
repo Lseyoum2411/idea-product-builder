@@ -6,6 +6,12 @@
 
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
 
+# Default Windows install; fixes "gh is not recognized" until the terminal is restarted
+$ghInstall = Join-Path $env:ProgramFiles "GitHub CLI"
+if (Test-Path (Join-Path $ghInstall "gh.exe")) {
+    $env:Path = "$ghInstall;$env:Path"
+}
+
 Set-Location $PSScriptRoot\..
 
 function Test-GhAuth {
