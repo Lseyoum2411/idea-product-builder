@@ -1,4 +1,4 @@
-# Product Buddy (`idea-product-builder`)
+# Product Buddy (`idea-product-buddyr`)
 
 Next.js 14 app that turns a short product brief into a structured solo build plan (PRD, prompts, roadmap, tech stack, code snippets, checklist) via the Anthropic API.
 
